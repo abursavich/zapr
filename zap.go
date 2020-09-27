@@ -76,7 +76,7 @@ type Config struct {
 	SampleInitial    int
 	SampleThereafter int
 
-	Metrics *Metrics
+	Metrics Metrics
 }
 
 // DefaultConfig returns the default Config.
@@ -103,7 +103,7 @@ func DefaultConfig() *Config {
 		Development:      false,
 		SampleInitial:    100,
 		SampleThereafter: 100,
-		Metrics:          NewMetrics(),
+		Metrics:          NewPrometheusMetrics(),
 	}
 }
 

@@ -53,14 +53,14 @@ type zapLogr struct {
 	errKey     string
 	logLevel   int
 	maxLevel   int
-	metrics    *Metrics
+	metrics    Metrics
 }
 
 // NewLogger creates a new logr.Logger with the given Config.
 func NewLogger(cfg *Config) Logger {
 	underlying := newZapLogger(cfg)
 	if cfg.Metrics != nil {
-		cfg.Metrics.initLogger(underlying)
+		cfg.Metrics.Init(loggerName(underlying))
 	}
 	logger := underlying.WithOptions(zap.AddCallerSkip(1))
 	return &zapLogr{
@@ -156,7 +156,7 @@ func (z *zapLogr) WithName(name string) logr.Logger {
 	v.underlying = v.underlying.Named(name)
 	v.logger = v.underlying.WithOptions(zap.AddCallerSkip(1))
 	if v.metrics != nil {
-		v.metrics.initLogger(v.underlying)
+		v.metrics.Init(loggerName(v.underlying))
 	}
 	return &v
 }

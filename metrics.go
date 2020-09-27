@@ -11,16 +11,30 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Metrics are a prometheus.Collector for log metrics.
-type Metrics struct {
-	lines  *prometheus.CounterVec
-	bytes  *prometheus.CounterVec
-	errors *prometheus.CounterVec
+// Metrics represent the ability to observe log metrics.
+type Metrics interface {
+	// Init initializes metrics for the named logger when it's created.
+	// Logger names are not required to be unique and it may be called
+	// with a duplicate name at any time.
+	Init(logger string)
+
+	// ObserveEntryLogged observes logged entry metrics for the named logger, at
+	// the given level, and with the given bytes.
+	ObserveEntryLogged(logger string, level string, bytes int)
+
+	// ObserveEncoderError observes an error encoding an entry for the named logger.
+	ObserveEncoderError(logger string)
 }
 
-// NewMetrics returns new Metrics.
-func NewMetrics() *Metrics {
-	return &Metrics{
+// PrometheusMetrics represent the ability to observe metrics for Prometheus.
+type PrometheusMetrics interface {
+	prometheus.Collector
+	Metrics
+}
+
+// NewPrometheusMetrics returns new PrometheusMetrics.
+func NewPrometheusMetrics() PrometheusMetrics {
+	return &promMetrics{
 		lines: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "log_lines_total",
@@ -45,38 +59,44 @@ func NewMetrics() *Metrics {
 	}
 }
 
-// Describe implements the prometheus.Collector interface.
-func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
+type promMetrics struct {
+	lines  *prometheus.CounterVec
+	bytes  *prometheus.CounterVec
+	errors *prometheus.CounterVec
+}
+
+func (m *promMetrics) Describe(ch chan<- *prometheus.Desc) {
 	m.lines.Describe(ch)
 	m.bytes.Describe(ch)
 	m.errors.Describe(ch)
 }
 
-// Collect implements the prometheus.Collector interface.
-func (m *Metrics) Collect(ch chan<- prometheus.Metric) {
+func (m *promMetrics) Collect(ch chan<- prometheus.Metric) {
 	m.lines.Collect(ch)
 	m.bytes.Collect(ch)
 	m.errors.Collect(ch)
 }
 
-func (m *Metrics) initLogger(log *zap.Logger) {
-	name := log.Check(zapcore.FatalLevel, "").LoggerName
+func (m *promMetrics) Init(logger string) {
 	for _, lvl := range []zapcore.Level{zap.InfoLevel, zap.ErrorLevel} {
-		m.lines.WithLabelValues(name, lvl.String())
-		m.bytes.WithLabelValues(name, lvl.String())
+		m.lines.WithLabelValues(logger, lvl.String())
+		m.bytes.WithLabelValues(logger, lvl.String())
 	}
-	m.errors.WithLabelValues(name)
+	m.errors.WithLabelValues(logger)
+}
+
+func (m *promMetrics) ObserveEntryLogged(logger string, level string, bytes int) {
+	m.bytes.WithLabelValues(logger, level).Add(float64(bytes))
+	m.lines.WithLabelValues(logger, level).Inc()
+}
+
+func (m *promMetrics) ObserveEncoderError(logger string) {
+	m.errors.WithLabelValues(logger).Inc()
 }
 
 type metricsEncoder struct {
 	zapcore.Encoder
-	metrics *Metrics
-}
-
-// NewMetricsEncoder returns an Encoder that wraps the given Encoder
-// and records metrics.
-func NewMetricsEncoder(e zapcore.Encoder, m *Metrics) zapcore.Encoder {
-	return &metricsEncoder{Encoder: e, metrics: m}
+	metrics Metrics
 }
 
 func (enc *metricsEncoder) Clone() zapcore.Encoder {
@@ -89,11 +109,13 @@ func (enc *metricsEncoder) Clone() zapcore.Encoder {
 func (enc *metricsEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
 	b, err := enc.Encoder.EncodeEntry(entry, fields)
 	if err != nil {
-		enc.metrics.errors.WithLabelValues(entry.LoggerName).Inc()
+		enc.metrics.ObserveEncoderError(entry.LoggerName)
 		return nil, err
 	}
-	lvl := entry.Level.String()
-	enc.metrics.lines.WithLabelValues(entry.LoggerName, lvl).Inc()
-	enc.metrics.bytes.WithLabelValues(entry.LoggerName, lvl).Add(float64(b.Len()))
+	enc.metrics.ObserveEntryLogged(entry.LoggerName, entry.Level.String(), b.Len())
 	return b, err
+}
+
+func loggerName(log *zap.Logger) string {
+	return log.Check(zapcore.FatalLevel, "").LoggerName
 }
