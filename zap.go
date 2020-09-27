@@ -8,6 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -186,10 +188,10 @@ func (c *Config) RegisterCommonFlags(fs *flag.FlagSet) *Config {
 		fs = flag.CommandLine
 	}
 	fs.IntVar(&c.Level, "log-level", c.Level, "Log level.")
-	fs.Var(&encoderFlag{&c.Encoder}, "log-format", `Log format (e.g. "json" or "console").`)
-	fs.Var(&timeEncoderFlag{&c.TimeEncoder}, "log-time-format", `Log time format (e.g. "iso8601", "millis", "nanos", or "secs").`)
-	fs.Var(&levelEncoderFlag{&c.LevelEncoder}, "log-level-format", `Log level format (e.g. "upper", "lower", or "color").`)
-	fs.Var(&callerEncoderFlag{&c.CallerEncoder}, "log-caller-format", `Log caller format (e.g. "short" or "full").`)
+	fs.Var(&encoderFlag{&c.Encoder}, "log-format", `Log format (e.g. `+listNames(encoderNames())+`).`)
+	fs.Var(&timeEncoderFlag{&c.TimeEncoder}, "log-time-format", `Log time format (e.g. `+listNames(timeEncoderNames())+`).`)
+	fs.Var(&levelEncoderFlag{&c.LevelEncoder}, "log-level-format", `Log level format (e.g. `+listNames(levelEncoderNames())+`).`)
+	fs.Var(&callerEncoderFlag{&c.CallerEncoder}, "log-caller-format", `Log caller format (e.g. `+listNames(callerEncoderNames())+`).`)
 	return c
 }
 
@@ -199,17 +201,39 @@ func (c *Config) RegisterFlags(fs *flag.FlagSet) *Config {
 	if fs == nil {
 		fs = flag.CommandLine
 	}
+	fs.Var(&durationEncoderFlag{&c.DurationEncoder}, "log-duration-format", `Log duration format (e.g. `+listNames(durationEncoderNames())+`).`)
 	fs.StringVar(&c.TimeKey, "log-time-key", c.TimeKey, "Log time key.")
 	fs.StringVar(&c.LevelKey, "log-level-key", c.LevelKey, "Log level key.")
 	fs.StringVar(&c.MessageKey, "log-message-key", c.MessageKey, "Log message key.")
 	fs.StringVar(&c.CallerKey, "log-caller-key", c.CallerKey, "Log caller key.")
 	fs.StringVar(&c.FunctionKey, "log-function-key", c.FunctionKey, "Log function key.")
 	fs.StringVar(&c.StacktraceKey, "log-stacktrace-key", c.StacktraceKey, "Log stacktrace key.")
-	fs.BoolVar(&c.EnableStacktrace, "log-stacktrace", c.EnableStacktrace, `Log stacktrace on error or higher levels.`)
+	fs.BoolVar(&c.EnableStacktrace, "log-stacktrace", c.EnableStacktrace, `Log stacktrace on error.`)
 	fs.BoolVar(&c.EnableCaller, "log-caller", c.EnableCaller, `Log caller file and line.`)
 	fs.IntVar(&c.SampleInitial, "log-sample-initial", c.SampleInitial, "Log every call up to this count per second.")
 	fs.IntVar(&c.SampleThereafter, "log-sample-thereafter", c.SampleThereafter, "Log only one of this many calls after reaching the initial sample per second.")
 	return c.RegisterCommonFlags(fs)
+}
+
+func listNames(names []string) string {
+	switch len(names) {
+	case 0:
+		return ""
+	case 1:
+		return strconv.Quote(names[0])
+	case 2:
+		return strconv.Quote(names[0]) + " or " + strconv.Quote(names[1])
+	default:
+		var b strings.Builder
+		last := len(names) - 1
+		for _, name := range names[:last] {
+			b.WriteString(strconv.Quote(name))
+			b.WriteString(", ")
+		}
+		b.WriteString("or ")
+		b.WriteString(strconv.Quote(names[last]))
+		return b.String()
+	}
 }
 
 // An Encoder provides a named zapcore.Encoder.
@@ -227,9 +251,34 @@ func (e *encoder) NewEncoder(c zapcore.EncoderConfig) zapcore.Encoder { return e
 func (e *encoder) Name() string                                       { return e.name }
 
 var (
+	encoders       = make(map[string]Encoder)
 	consoleEncoder = Encoder(&encoder{name: "console", ctor: zapcore.NewConsoleEncoder})
 	jsonEncoder    = Encoder(&encoder{name: "json", ctor: zapcore.NewJSONEncoder})
 )
+
+// RegisterEncoder registers the Encoder for use as a flag argument.
+func RegisterEncoder(e Encoder) error {
+	name := e.Name()
+	if _, ok := encoders[name]; ok {
+		return fmt.Errorf("zapr: Encoder %q already registered", name)
+	}
+	encoders[name] = e
+	return nil
+}
+
+func init() {
+	RegisterEncoder(consoleEncoder)
+	RegisterEncoder(jsonEncoder)
+}
+
+func encoderNames() []string {
+	names := make([]string, 0, len(encoders))
+	for name := range encoders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // ConsoleEncoder creates an encoder whose output is designed for human
 // consumption, rather than machine consumption.
@@ -244,15 +293,11 @@ type encoderFlag struct {
 
 func (f *encoderFlag) Get() interface{} { return *f.enc }
 func (f *encoderFlag) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "json":
-		*f.enc = jsonEncoder
-	case "console":
-		*f.enc = consoleEncoder
-	default:
-		return fmt.Errorf("unknown encoder: %q", s)
+	if e, ok := encoders[s]; ok {
+		*f.enc = e
+		return nil
 	}
-	return nil
+	return fmt.Errorf("unknown encoder: %q", s)
 }
 func (f *encoderFlag) String() string {
 	if f.enc == nil {
@@ -276,6 +321,7 @@ func (e *timeEncoder) TimeEncoder() zapcore.TimeEncoder { return e.enc }
 func (e *timeEncoder) Name() string                     { return e.name }
 
 var (
+	timeEncoders       = make(map[string]TimeEncoder)
 	iso8601TimeEncoder = TimeEncoder(&timeEncoder{name: "iso8601", enc: zapcore.ISO8601TimeEncoder})
 	millisTimeEncoder  = TimeEncoder(&timeEncoder{name: "millis", enc: zapcore.EpochMillisTimeEncoder})
 	nanosTimeEncoder   = TimeEncoder(&timeEncoder{name: "nanos", enc: zapcore.EpochNanosTimeEncoder})
@@ -287,6 +333,33 @@ var (
 		},
 	})
 )
+
+// RegisterTimeEncoder registers the TimeEncoder for use as a flag argument.
+func RegisterTimeEncoder(e TimeEncoder) error {
+	name := e.Name()
+	if _, ok := timeEncoders[name]; ok {
+		return fmt.Errorf("zapr: TimeEncoder %q already registered", name)
+	}
+	timeEncoders[name] = e
+	return nil
+}
+
+func init() {
+	RegisterTimeEncoder(iso8601TimeEncoder)
+	RegisterTimeEncoder(millisTimeEncoder)
+	RegisterTimeEncoder(nanosTimeEncoder)
+	RegisterTimeEncoder(secsTimeEncoder)
+	RegisterTimeEncoder(rfc3339TimeEncoder)
+}
+
+func timeEncoderNames() []string {
+	names := make([]string, 0, len(timeEncoders))
+	for name := range timeEncoders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 func encodeTimeLayout(t time.Time, layout string, enc zapcore.PrimitiveArrayEncoder) {
 	switch enc := enc.(type) {
@@ -323,21 +396,11 @@ type timeEncoderFlag struct {
 
 func (f *timeEncoderFlag) Get() interface{} { return *f.enc }
 func (f *timeEncoderFlag) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "iso8601":
-		*f.enc = iso8601TimeEncoder
-	case "rfc3339":
-		*f.enc = rfc3339TimeEncoder
-	case "ns", "nanos", "nanoseconds":
-		*f.enc = nanosTimeEncoder
-	case "ms", "millis", "milliseconds":
-		*f.enc = millisTimeEncoder
-	case "s", "secs", "seconds":
-		*f.enc = secsTimeEncoder
-	default:
-		return fmt.Errorf("unknown time encoder: %q", s)
+	if e, ok := timeEncoders[s]; ok {
+		*f.enc = e
+		return nil
 	}
-	return nil
+	return fmt.Errorf("unknown time encoder: %q", s)
 }
 func (f *timeEncoderFlag) String() string {
 	if f.enc == nil {
@@ -361,10 +424,36 @@ func (e *levelEncoder) LevelEncoder() zapcore.LevelEncoder { return e.enc }
 func (e *levelEncoder) Name() string                       { return e.name }
 
 var (
+	levelEncoders         = make(map[string]LevelEncoder)
 	colorLevelEncoder     = LevelEncoder(&levelEncoder{name: "color", enc: zapcore.CapitalColorLevelEncoder})
 	lowercaseLevelEncoder = LevelEncoder(&levelEncoder{name: "lower", enc: zapcore.LowercaseLevelEncoder})
 	uppercaseLevelEncoder = LevelEncoder(&levelEncoder{name: "upper", enc: zapcore.CapitalLevelEncoder})
 )
+
+// RegisterLevelEncoder registers the LevelEncoder for use as a flag argument.
+func RegisterLevelEncoder(e LevelEncoder) error {
+	name := e.Name()
+	if _, ok := levelEncoders[name]; ok {
+		return fmt.Errorf("zapr: LevelEncoder %q already registered", name)
+	}
+	levelEncoders[name] = e
+	return nil
+}
+
+func init() {
+	RegisterLevelEncoder(colorLevelEncoder)
+	RegisterLevelEncoder(lowercaseLevelEncoder)
+	RegisterLevelEncoder(uppercaseLevelEncoder)
+}
+
+func levelEncoderNames() []string {
+	names := make([]string, 0, len(levelEncoders))
+	for name := range levelEncoders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // ColorLevelEncoder serializes a Level to an all-caps string and adds color.
 // For example, InfoLevel is serialized to "INFO" and colored blue.
@@ -384,17 +473,11 @@ type levelEncoderFlag struct {
 
 func (f *levelEncoderFlag) Get() interface{} { return *f.enc }
 func (f *levelEncoderFlag) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "upper", "uppercase":
-		*f.enc = uppercaseLevelEncoder
-	case "lower", "lowercase":
-		*f.enc = lowercaseLevelEncoder
-	case "color":
-		*f.enc = colorLevelEncoder
-	default:
-		return fmt.Errorf("unknown level encoder: %q", s)
+	if e, ok := levelEncoders[s]; ok {
+		*f.enc = e
+		return nil
 	}
-	return nil
+	return fmt.Errorf("unknown level encoder: %q", s)
 }
 func (f *levelEncoderFlag) String() string {
 	if f.enc == nil {
@@ -418,11 +501,38 @@ func (e *durationEncoder) DurationEncoder() zapcore.DurationEncoder { return e.e
 func (e *durationEncoder) Name() string                             { return e.name }
 
 var (
+	durationEncoders      = make(map[string]DurationEncoder)
 	stringDurationEncoder = DurationEncoder(&durationEncoder{name: "string", enc: zapcore.StringDurationEncoder})
 	nanosDurationEncoder  = DurationEncoder(&durationEncoder{name: "nanos", enc: zapcore.NanosDurationEncoder})
 	millisDurationEncoder = DurationEncoder(&durationEncoder{name: "millis", enc: zapcore.MillisDurationEncoder})
 	secsDurationEncoder   = DurationEncoder(&durationEncoder{name: "secs", enc: zapcore.SecondsDurationEncoder})
 )
+
+// RegisterDurationEncoder registers the DurationEncoder for use as a flag argument.
+func RegisterDurationEncoder(e DurationEncoder) error {
+	name := e.Name()
+	if _, ok := durationEncoders[name]; ok {
+		return fmt.Errorf("zapr: DurationEncoder %q already registered", name)
+	}
+	durationEncoders[name] = e
+	return nil
+}
+
+func init() {
+	RegisterDurationEncoder(stringDurationEncoder)
+	RegisterDurationEncoder(nanosDurationEncoder)
+	RegisterDurationEncoder(millisDurationEncoder)
+	RegisterDurationEncoder(secsDurationEncoder)
+}
+
+func durationEncoderNames() []string {
+	names := make([]string, 0, len(durationEncoders))
+	for name := range durationEncoders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // StringDurationEncoder serializes a time.Duration using its String method.
 func StringDurationEncoder() DurationEncoder { return stringDurationEncoder }
@@ -442,19 +552,11 @@ type durationEncoderFlag struct {
 
 func (f *durationEncoderFlag) Get() interface{} { return *f.enc }
 func (f *durationEncoderFlag) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "string":
-		*f.enc = stringDurationEncoder
-	case "ns", "nanos", "nanoseconds":
-		*f.enc = nanosDurationEncoder
-	case "ms", "millis", "milliseconds":
-		*f.enc = millisDurationEncoder
-	case "s", "secs", "seconds":
-		*f.enc = secsDurationEncoder
-	default:
-		return fmt.Errorf("unknown time encoder: %q", s)
+	if e, ok := durationEncoders[s]; ok {
+		*f.enc = e
+		return nil
 	}
-	return nil
+	return fmt.Errorf("unknown duration encoder: %q", s)
 }
 func (f *durationEncoderFlag) String() string {
 	if f.enc == nil {
@@ -478,9 +580,34 @@ func (e *callerEncoder) CallerEncoder() zapcore.CallerEncoder { return e.enc }
 func (e *callerEncoder) Name() string                         { return e.name }
 
 var (
+	callerEncoders     = make(map[string]CallerEncoder)
 	shortCallerEncoder = CallerEncoder(&callerEncoder{name: "short", enc: zapcore.ShortCallerEncoder})
 	fullCallerEncoder  = CallerEncoder(&callerEncoder{name: "full", enc: zapcore.FullCallerEncoder})
 )
+
+// RegisterCallerEncoder registers the CallerEncoder for use as a flag argument.
+func RegisterCallerEncoder(e CallerEncoder) error {
+	name := e.Name()
+	if _, ok := callerEncoders[name]; ok {
+		return fmt.Errorf("zapr: CallerEncoder %q already registered", name)
+	}
+	callerEncoders[name] = e
+	return nil
+}
+
+func init() {
+	RegisterCallerEncoder(shortCallerEncoder)
+	RegisterCallerEncoder(fullCallerEncoder)
+}
+
+func callerEncoderNames() []string {
+	names := make([]string, 0, len(callerEncoders))
+	for name := range callerEncoders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // ShortCallerEncoder serializes a caller in package/file:line format, trimming
 // all but the final directory from the full path.
@@ -496,15 +623,11 @@ type callerEncoderFlag struct {
 
 func (f *callerEncoderFlag) Get() interface{} { return *f.enc }
 func (f *callerEncoderFlag) Set(s string) error {
-	switch strings.ToLower(s) {
-	case "short":
-		*f.enc = shortCallerEncoder
-	case "full":
-		*f.enc = fullCallerEncoder
-	default:
-		return fmt.Errorf("unknown level encoder: %q", s)
+	if e, ok := callerEncoders[s]; ok {
+		*f.enc = e
+		return nil
 	}
-	return nil
+	return fmt.Errorf("unknown caller encoder: %q", s)
 }
 func (f *callerEncoderFlag) String() string {
 	if f.enc == nil {
