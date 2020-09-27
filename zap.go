@@ -105,7 +105,7 @@ func DefaultConfig() *Config {
 		Development:      false,
 		SampleInitial:    100,
 		SampleThereafter: 100,
-		Metrics:          NewPrometheusMetrics(),
+		Metrics:          nil,
 	}
 }
 
