@@ -23,8 +23,8 @@ type Logger interface {
 	// interface (e.g. with the additional Underlying and Flush methods).
 	logr.Logger
 
-	// Underlying returns the underlying *zap.Logger with no extra
-	// caller skips. It may return nil if the logger is disabled.
+	// Underlying returns the underlying *zap.Logger with no caller skips.
+	// It may return nil if the logger is disabled.
 	Underlying() *zap.Logger
 
 	// Flush writes any buffered data to the underlying io.Writer.
@@ -59,10 +59,10 @@ type zapLogr struct {
 // NewLogger creates a new logr.Logger with the given Config.
 func NewLogger(cfg *Config) Logger {
 	underlying := newZapLogger(cfg)
-	if cfg.Metrics != nil {
-		cfg.Metrics.Init(loggerName(underlying))
-	}
 	logger := underlying.WithOptions(zap.AddCallerSkip(1))
+	if cfg.Metrics != nil {
+		cfg.Metrics.Init(loggerName(logger))
+	}
 	return &zapLogr{
 		underlying: underlying,
 		logger:     logger,
@@ -156,7 +156,7 @@ func (z *zapLogr) WithName(name string) logr.Logger {
 	v.underlying = v.underlying.Named(name)
 	v.logger = v.underlying.WithOptions(zap.AddCallerSkip(1))
 	if v.metrics != nil {
-		v.metrics.Init(loggerName(v.underlying))
+		v.metrics.Init(loggerName(v.logger))
 	}
 	return &v
 }
