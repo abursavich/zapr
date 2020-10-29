@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package zapr provides a logr.Logger interface around a zap implementation,
-// with Prometheus metrics and a standard library log.Logger adapter.
+// including metrics and a standard library log.Logger adapter.
 package zapr
 
 import (
