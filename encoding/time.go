@@ -25,7 +25,7 @@ var timeEncoders = make(map[string]TimeEncoder)
 func RegisterTimeEncoder(e TimeEncoder) error {
 	name := e.Name()
 	if _, ok := timeEncoders[name]; ok {
-		return fmt.Errorf("zapr: TimeEncoder %q already ", name)
+		return fmt.Errorf("zapr: already registered TimeEncoder: %q", name)
 	}
 	timeEncoders[name] = e
 	return nil

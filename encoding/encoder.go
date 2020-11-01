@@ -25,7 +25,7 @@ var encoders = make(map[string]Encoder)
 func RegisterEncoder(e Encoder) error {
 	name := e.Name()
 	if _, ok := encoders[name]; ok {
-		return fmt.Errorf("zapr: Encoder %q already ", name)
+		return fmt.Errorf("zapr: already registered Encoder: %q", name)
 	}
 	encoders[name] = e
 	return nil

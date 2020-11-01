@@ -24,7 +24,7 @@ var durationEncoders = make(map[string]DurationEncoder)
 func RegisterDurationEncoder(e DurationEncoder) error {
 	name := e.Name()
 	if _, ok := durationEncoders[name]; ok {
-		return fmt.Errorf("zapr: DurationEncoder %q already ", name)
+		return fmt.Errorf("zapr: already registered DurationEncoder: %q", name)
 	}
 	durationEncoders[name] = e
 	return nil

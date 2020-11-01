@@ -24,7 +24,7 @@ var levelEncoders = make(map[string]LevelEncoder)
 func RegisterLevelEncoder(e LevelEncoder) error {
 	name := e.Name()
 	if _, ok := levelEncoders[name]; ok {
-		return fmt.Errorf("zapr: LevelEncoder %q already ", name)
+		return fmt.Errorf("zapr: already registered LevelEncoder: %q", name)
 	}
 	levelEncoders[name] = e
 	return nil
