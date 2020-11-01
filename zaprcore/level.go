@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package zapr
+package zaprcore
 
 import (
 	"flag"
 	"fmt"
+	"sort"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -27,6 +28,16 @@ func RegisterLevelEncoder(e LevelEncoder) error {
 	}
 	levelEncoders[name] = e
 	return nil
+}
+
+// LevelEncoders returns the registered LevelEncoders.
+func LevelEncoders() []LevelEncoder {
+	s := make([]LevelEncoder, 0, len(levelEncoders))
+	for _, e := range levelEncoders {
+		s = append(s, e)
+	}
+	sort.Slice(s, func(i, k int) bool { return s[i].Name() < s[k].Name() })
+	return s
 }
 
 type levelEncoder struct {

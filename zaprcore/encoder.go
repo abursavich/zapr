@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package zapr
+package zaprcore
 
 import (
 	"flag"
 	"fmt"
+	"sort"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -27,6 +28,16 @@ func RegisterEncoder(e Encoder) error {
 	}
 	encoders[name] = e
 	return nil
+}
+
+// Encoders returns the registered Encoders.
+func Encoders() []Encoder {
+	s := make([]Encoder, 0, len(encoders))
+	for _, e := range encoders {
+		s = append(s, e)
+	}
+	sort.Slice(s, func(i, k int) bool { return s[i].Name() < s[k].Name() })
+	return s
 }
 
 type encoder struct {

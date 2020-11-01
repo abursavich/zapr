@@ -12,16 +12,17 @@ import (
 	"strings"
 	"time"
 
+	"bursavich.dev/zapr/zaprcore"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 var (
-	defaultEncoder         = jsonEncoder
-	defaultTimeEncoder     = iso8601TimeEncoder
-	defaultLevelEncoder    = uppercaseLevelEncoder
-	defaultDurationEncoder = secsDurationEncoder
-	defaultCallerEncoder   = shortCallerEncoder
+	defaultEncoder         = zaprcore.JSONEncoder()
+	defaultTimeEncoder     = zaprcore.ISO8601TimeEncoder()
+	defaultLevelEncoder    = zaprcore.UppercaseLevelEncoder()
+	defaultDurationEncoder = zaprcore.SecondsDurationEncoder()
+	defaultCallerEncoder   = zaprcore.ShortCallerEncoder()
 )
 
 // newZapLogger returns a new zap.Logger with the given config.
@@ -64,11 +65,11 @@ type Config struct {
 	StacktraceKey string
 	LineEnding    string
 
-	Encoder         Encoder
-	TimeEncoder     TimeEncoder
-	LevelEncoder    LevelEncoder
-	DurationEncoder DurationEncoder
-	CallerEncoder   CallerEncoder
+	Encoder         zaprcore.Encoder
+	TimeEncoder     zaprcore.TimeEncoder
+	LevelEncoder    zaprcore.LevelEncoder
+	DurationEncoder zaprcore.DurationEncoder
+	CallerEncoder   zaprcore.CallerEncoder
 
 	EnableStacktrace bool
 	EnableCaller     bool
@@ -113,9 +114,9 @@ func DevelopmentConfig() *Config {
 	cfg := DefaultConfig()
 	cfg.Level = 2
 	cfg.FunctionKey = "func"
-	cfg.Encoder = consoleEncoder
-	cfg.LevelEncoder = colorLevelEncoder
-	cfg.DurationEncoder = stringDurationEncoder
+	cfg.Encoder = zaprcore.ConsoleEncoder()
+	cfg.LevelEncoder = zaprcore.ColorLevelEncoder()
+	cfg.DurationEncoder = zaprcore.StringDurationEncoder()
 	cfg.EnableStacktrace = true
 	cfg.Development = true
 	return cfg
@@ -200,6 +201,7 @@ func (c *Config) RegisterFlags(fs *flag.FlagSet) *Config {
 	if fs == nil {
 		fs = flag.CommandLine
 	}
+	c.RegisterCommonFlags(fs)
 	c.registerDurationEncoderFlag(fs)
 	fs.StringVar(&c.TimeKey, "log-time-key", c.TimeKey, "Log time key.")
 	fs.StringVar(&c.LevelKey, "log-level-key", c.LevelKey, "Log level key.")
@@ -211,52 +213,52 @@ func (c *Config) RegisterFlags(fs *flag.FlagSet) *Config {
 	fs.BoolVar(&c.EnableCaller, "log-caller", c.EnableCaller, `Log caller file and line.`)
 	fs.IntVar(&c.SampleInitial, "log-sample-initial", c.SampleInitial, "Log every call up to this count per second.")
 	fs.IntVar(&c.SampleThereafter, "log-sample-thereafter", c.SampleThereafter, "Log only one of this many calls after reaching the initial sample per second.")
-	return c.RegisterCommonFlags(fs)
+	return c
 }
 
 func (c *Config) registerEncoderFlag(fs *flag.FlagSet) {
 	var names []string
-	for name := range encoders {
-		names = append(names, name)
+	for _, e := range zaprcore.Encoders() {
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
-	fs.Var(EncoderFlag(&c.Encoder), "log-format", `Log format (e.g. `+listNames(names)+`).`)
+	fs.Var(zaprcore.EncoderFlag(&c.Encoder), "log-format", `Log format (e.g. `+listNames(names)+`).`)
 }
 
 func (c *Config) registerTimeEncoderFlag(fs *flag.FlagSet) {
 	var names []string
-	for name := range timeEncoders {
-		names = append(names, name)
+	for _, e := range zaprcore.TimeEncoders() {
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
-	fs.Var(TimeEncoderFlag(&c.TimeEncoder), "log-time-format", `Log time format (e.g. `+listNames(names)+`).`)
+	fs.Var(zaprcore.TimeEncoderFlag(&c.TimeEncoder), "log-time-format", `Log time format (e.g. `+listNames(names)+`).`)
 }
 
 func (c *Config) registerLevelEncoderFlag(fs *flag.FlagSet) {
 	var names []string
-	for name := range levelEncoders {
-		names = append(names, name)
+	for _, e := range zaprcore.LevelEncoders() {
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
-	fs.Var(LevelEncoderFlag(&c.LevelEncoder), "log-level-format", `Log level format (e.g. `+listNames(names)+`).`)
+	fs.Var(zaprcore.LevelEncoderFlag(&c.LevelEncoder), "log-level-format", `Log level format (e.g. `+listNames(names)+`).`)
 }
 
 func (c *Config) registerCallerEncoderFlag(fs *flag.FlagSet) {
 	var names []string
-	for name := range callerEncoders {
-		names = append(names, name)
+	for _, e := range zaprcore.CallerEncoders() {
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
-	fs.Var(CallerEncoderFlag(&c.CallerEncoder), "log-caller-format", `Log caller format (e.g. `+listNames(names)+`).`)
+	fs.Var(zaprcore.CallerEncoderFlag(&c.CallerEncoder), "log-caller-format", `Log caller format (e.g. `+listNames(names)+`).`)
 }
 
 func (c *Config) registerDurationEncoderFlag(fs *flag.FlagSet) {
 	var names []string
-	for name := range durationEncoders {
-		names = append(names, name)
+	for _, e := range zaprcore.DurationEncoders() {
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
-	fs.Var(DurationEncoderFlag(&c.DurationEncoder), "log-duration-format", `Log duration format (e.g. `+listNames(names)+`).`)
+	fs.Var(zaprcore.DurationEncoderFlag(&c.DurationEncoder), "log-duration-format", `Log duration format (e.g. `+listNames(names)+`).`)
 }
 
 func listNames(names []string) string {

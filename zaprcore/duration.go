@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package zapr
+package zaprcore
 
 import (
 	"flag"
 	"fmt"
+	"sort"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -27,6 +28,16 @@ func RegisterDurationEncoder(e DurationEncoder) error {
 	}
 	durationEncoders[name] = e
 	return nil
+}
+
+// DurationEncoders returns the registered DurationEncoders.
+func DurationEncoders() []DurationEncoder {
+	s := make([]DurationEncoder, 0, len(durationEncoders))
+	for _, e := range durationEncoders {
+		s = append(s, e)
+	}
+	sort.Slice(s, func(i, k int) bool { return s[i].Name() < s[k].Name() })
+	return s
 }
 
 type durationEncoder struct {
