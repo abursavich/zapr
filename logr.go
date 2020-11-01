@@ -56,20 +56,20 @@ type zapLogr struct {
 	metrics    Metrics
 }
 
-// NewLogger creates a new logr.Logger with the given Config.
-func NewLogger(cfg *Config) Logger {
-	underlying := newZapLogger(cfg)
+// NewLogger creates a new Logger with the given Config.
+func NewLogger(c *Config) Logger {
+	underlying := newZapLogger(c)
 	logger := underlying.WithOptions(zap.AddCallerSkip(1))
-	if cfg.Metrics != nil {
-		cfg.Metrics.Init(loggerName(logger))
+	if c.Metrics != nil {
+		c.Metrics.Init(loggerName(logger))
 	}
 	return &zapLogr{
 		underlying: underlying,
 		logger:     logger,
-		errKey:     cfg.ErrorKey,
+		errKey:     c.ErrorKey,
 		logLevel:   0,
-		maxLevel:   cfg.Level,
-		metrics:    cfg.Metrics,
+		maxLevel:   c.Level,
+		metrics:    c.Metrics,
 	}
 }
 
