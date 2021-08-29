@@ -57,8 +57,8 @@ var (
 )
 
 func init() {
-	RegisterEncoder(consoleEncoder)
-	RegisterEncoder(jsonEncoder)
+	must(RegisterEncoder(consoleEncoder))
+	must(RegisterEncoder(jsonEncoder))
 }
 
 // ConsoleEncoder creates an encoder whose output is designed for human
@@ -88,4 +88,10 @@ func (f *encoderFlag) String() string {
 		return ""
 	}
 	return (*f.e).Name()
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

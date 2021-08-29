@@ -65,11 +65,11 @@ var (
 )
 
 func init() {
-	RegisterTimeEncoder(iso8601TimeEncoder)
-	RegisterTimeEncoder(millisTimeEncoder)
-	RegisterTimeEncoder(nanosTimeEncoder)
-	RegisterTimeEncoder(secsTimeEncoder)
-	RegisterTimeEncoder(rfc3339TimeEncoder)
+	must(RegisterTimeEncoder(iso8601TimeEncoder))
+	must(RegisterTimeEncoder(millisTimeEncoder))
+	must(RegisterTimeEncoder(nanosTimeEncoder))
+	must(RegisterTimeEncoder(secsTimeEncoder))
+	must(RegisterTimeEncoder(rfc3339TimeEncoder))
 }
 
 func encodeTimeLayout(t time.Time, layout string, e zapcore.PrimitiveArrayEncoder) {

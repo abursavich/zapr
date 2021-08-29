@@ -58,10 +58,10 @@ var (
 )
 
 func init() {
-	RegisterDurationEncoder(stringDurationEncoder)
-	RegisterDurationEncoder(nanosDurationEncoder)
-	RegisterDurationEncoder(millisDurationEncoder)
-	RegisterDurationEncoder(secsDurationEncoder)
+	must(RegisterDurationEncoder(stringDurationEncoder))
+	must(RegisterDurationEncoder(nanosDurationEncoder))
+	must(RegisterDurationEncoder(millisDurationEncoder))
+	must(RegisterDurationEncoder(secsDurationEncoder))
 }
 
 // StringDurationEncoder serializes a time.Duration using its String method.

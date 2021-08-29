@@ -56,8 +56,8 @@ var (
 )
 
 func init() {
-	RegisterCallerEncoder(shortCallerEncoder)
-	RegisterCallerEncoder(fullCallerEncoder)
+	must(RegisterCallerEncoder(shortCallerEncoder))
+	must(RegisterCallerEncoder(fullCallerEncoder))
 }
 
 // ShortCallerEncoder serializes a caller in package/file:line format, trimming

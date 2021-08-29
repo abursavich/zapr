@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: BSD-3-Clause
-//
 // Copyright 2020 Andy Bursavich. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -57,9 +55,9 @@ var (
 )
 
 func init() {
-	RegisterLevelEncoder(colorLevelEncoder)
-	RegisterLevelEncoder(lowercaseLevelEncoder)
-	RegisterLevelEncoder(uppercaseLevelEncoder)
+	must(RegisterLevelEncoder(colorLevelEncoder))
+	must(RegisterLevelEncoder(lowercaseLevelEncoder))
+	must(RegisterLevelEncoder(uppercaseLevelEncoder))
 }
 
 // ColorLevelEncoder serializes a Level to an all-caps string and adds color.
