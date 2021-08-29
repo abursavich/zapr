@@ -22,7 +22,7 @@ type LogSink interface {
 	logr.CallDepthLogSink
 
 	// Underlying returns the underlying *zap.Logger with no caller skips.
-	// It may return nil if the logger is disabled.
+	// Any names or added keys and values remain.
 	Underlying() *zap.Logger
 
 	// Flush writes any buffered data to the underlying io.Writer.
@@ -30,14 +30,12 @@ type LogSink interface {
 }
 
 type sink struct {
-	underlying *zap.Logger
-	logger     *zap.Logger
-	info       logr.RuntimeInfo
-	depth      int
-	errKey     string
-	logLevel   int
-	maxLevel   int
-	observer   Observer
+	logger   *zap.Logger
+	depth    int
+	errKey   string
+	logLevel int
+	maxLevel int
+	observer Observer
 }
 
 // NewLogger returns a new Logger with the given Config.
@@ -47,17 +45,18 @@ func NewLogger(c *Config) logr.Logger {
 
 // NewLogSink returns a new LogSink with the given Config.
 func NewLogSink(c *Config) LogSink {
-	underlying := newZapLogger(c)
+	const depth = 1
+	logger := newZapLogger(c).WithOptions(zap.AddCallerSkip(depth))
 	if c.Observer != nil {
-		c.Observer.Init(loggerName(underlying))
+		c.Observer.Init(loggerName(logger))
 	}
 	return &sink{
-		underlying: underlying,
-		logger:     underlying,
-		errKey:     c.ErrorKey,
-		logLevel:   0,
-		maxLevel:   c.Level,
-		observer:   c.Observer,
+		logger:   logger,
+		errKey:   c.ErrorKey,
+		depth:    depth,
+		logLevel: 0,
+		maxLevel: c.Level,
+		observer: c.Observer,
 	}
 }
 
@@ -101,8 +100,7 @@ func (s *sink) sweetenDPanic(msg string, fields ...zapcore.Field) {
 }
 
 func (s *sink) Init(info logr.RuntimeInfo) {
-	s.info = info
-	s.logger = s.underlying.WithOptions(zap.AddCallerSkip(s.info.CallDepth + s.depth))
+	s.logger = s.logger.WithOptions(zap.AddCallerSkip(info.CallDepth))
 }
 
 func (s *sink) Enabled(level int) bool { return level <= s.maxLevel }
@@ -136,8 +134,7 @@ func (s *sink) WithValues(keysAndValues ...interface{}) logr.LogSink {
 
 func (s *sink) WithName(name string) logr.LogSink {
 	v := *s
-	v.underlying = v.underlying.Named(name)
-	v.Init(v.info)
+	v.logger = v.logger.Named(name)
 	if v.observer != nil {
 		v.observer.Init(loggerName(v.logger))
 	}
@@ -149,12 +146,14 @@ func (s *sink) WithCallDepth(depth int) logr.LogSink {
 		return s
 	}
 	v := *s
+	v.logger = v.logger.WithOptions(zap.AddCallerSkip(depth))
 	v.depth += depth
-	v.Init(s.info)
 	return &v
 }
 
-func (s *sink) Underlying() *zap.Logger { return s.underlying }
+func (s *sink) Underlying() *zap.Logger {
+	return s.logger.WithOptions(zap.AddCallerSkip(-s.depth))
+}
 
 func (s *sink) Flush() error { return s.logger.Sync() }
 
