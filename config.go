@@ -78,7 +78,7 @@ type Config struct {
 	SampleInitial    int
 	SampleThereafter int
 
-	Metrics Metrics
+	Observer Observer
 }
 
 // DefaultConfig returns the default Config.
@@ -105,7 +105,7 @@ func DefaultConfig() *Config {
 		Development:      false,
 		SampleInitial:    100,
 		SampleThereafter: 100,
-		Metrics:          nil,
+		Observer:         nil,
 	}
 }
 
@@ -137,10 +137,10 @@ func (c *Config) encoder() zapcore.Encoder {
 		EncodeDuration: c.durationEncoder(),
 		EncodeCaller:   c.callerEncoder(),
 	})
-	if c.Metrics != nil {
-		return &metricsEncoder{
-			Encoder: enc,
-			metrics: c.Metrics,
+	if c.Observer != nil {
+		return &observerEncoder{
+			Encoder:  enc,
+			observer: c.Observer,
 		}
 	}
 	return enc

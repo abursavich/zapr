@@ -11,21 +11,21 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	_ zapr.Metrics         = (*Metrics)(nil)
-	_ prometheus.Collector = (*Metrics)(nil)
-)
+// An Observer observes zapr metrics for Prometheus.
+type Observer interface {
+	zapr.Observer
+	prometheus.Collector
+}
 
-// Metrics represent the ability to observe zapr metrics for Prometheus.
-type Metrics struct {
+type observer struct {
 	lines  *prometheus.CounterVec
 	bytes  *prometheus.CounterVec
 	errors *prometheus.CounterVec
 }
 
-// NewMetrics returns new Metrics.
-func NewMetrics() *Metrics {
-	return &Metrics{
+// NewObserver returns new Observer.
+func NewObserver() Observer {
+	return &observer{
 		lines: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "log_lines_total",
@@ -50,31 +50,31 @@ func NewMetrics() *Metrics {
 	}
 }
 
-func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
-	m.lines.Describe(ch)
-	m.bytes.Describe(ch)
-	m.errors.Describe(ch)
+func (o *observer) Describe(ch chan<- *prometheus.Desc) {
+	o.lines.Describe(ch)
+	o.bytes.Describe(ch)
+	o.errors.Describe(ch)
 }
 
-func (m *Metrics) Collect(ch chan<- prometheus.Metric) {
-	m.lines.Collect(ch)
-	m.bytes.Collect(ch)
-	m.errors.Collect(ch)
+func (o *observer) Collect(ch chan<- prometheus.Metric) {
+	o.lines.Collect(ch)
+	o.bytes.Collect(ch)
+	o.errors.Collect(ch)
 }
 
-func (m *Metrics) Init(logger string) {
+func (o *observer) Init(logger string) {
 	for _, lvl := range []zapcore.Level{zapcore.InfoLevel, zapcore.ErrorLevel} {
-		m.lines.WithLabelValues(logger, lvl.String())
-		m.bytes.WithLabelValues(logger, lvl.String())
+		o.lines.WithLabelValues(logger, lvl.String())
+		o.bytes.WithLabelValues(logger, lvl.String())
 	}
-	m.errors.WithLabelValues(logger)
+	o.errors.WithLabelValues(logger)
 }
 
-func (m *Metrics) ObserveEntryLogged(logger string, level string, bytes int) {
-	m.bytes.WithLabelValues(logger, level).Add(float64(bytes))
-	m.lines.WithLabelValues(logger, level).Inc()
+func (o *observer) ObserveEntryLogged(logger string, level string, bytes int) {
+	o.bytes.WithLabelValues(logger, level).Add(float64(bytes))
+	o.lines.WithLabelValues(logger, level).Inc()
 }
 
-func (m *Metrics) ObserveEncoderError(logger string) {
-	m.errors.WithLabelValues(logger).Inc()
+func (o *observer) ObserveEncoderError(logger string) {
+	o.errors.WithLabelValues(logger).Inc()
 }

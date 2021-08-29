@@ -37,7 +37,7 @@ type sink struct {
 	errKey     string
 	logLevel   int
 	maxLevel   int
-	metrics    Metrics
+	observer   Observer
 }
 
 // NewLogger returns a new Logger with the given Config.
@@ -48,8 +48,8 @@ func NewLogger(c *Config) logr.Logger {
 // NewLogSink returns a new LogSink with the given Config.
 func NewLogSink(c *Config) LogSink {
 	underlying := newZapLogger(c)
-	if c.Metrics != nil {
-		c.Metrics.Init(loggerName(underlying))
+	if c.Observer != nil {
+		c.Observer.Init(loggerName(underlying))
 	}
 	return &sink{
 		underlying: underlying,
@@ -57,7 +57,7 @@ func NewLogSink(c *Config) LogSink {
 		errKey:     c.ErrorKey,
 		logLevel:   0,
 		maxLevel:   c.Level,
-		metrics:    c.Metrics,
+		observer:   c.Observer,
 	}
 }
 
@@ -138,8 +138,8 @@ func (s *sink) WithName(name string) logr.LogSink {
 	v := *s
 	v.underlying = v.underlying.Named(name)
 	v.Init(v.info)
-	if v.metrics != nil {
-		v.metrics.Init(loggerName(v.logger))
+	if v.observer != nil {
+		v.observer.Init(loggerName(v.logger))
 	}
 	return &v
 }

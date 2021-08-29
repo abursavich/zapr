@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Metrics represent the ability to observe log metrics.
-type Metrics interface {
+// Observer represent the ability to observe log metrics.
+type Observer interface {
 	// Init initializes metrics for the named logger when it's created.
 	// Logger names are not required to be unique and it may be called
 	// with a duplicate name at any time.
@@ -25,25 +25,25 @@ type Metrics interface {
 	ObserveEncoderError(logger string)
 }
 
-type metricsEncoder struct {
+type observerEncoder struct {
 	zapcore.Encoder
-	metrics Metrics
+	observer Observer
 }
 
-func (enc *metricsEncoder) Clone() zapcore.Encoder {
-	return &metricsEncoder{
-		Encoder: enc.Encoder.Clone(),
-		metrics: enc.metrics,
+func (enc *observerEncoder) Clone() zapcore.Encoder {
+	return &observerEncoder{
+		Encoder:  enc.Encoder.Clone(),
+		observer: enc.observer,
 	}
 }
 
-func (enc *metricsEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
+func (enc *observerEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
 	b, err := enc.Encoder.EncodeEntry(entry, fields)
 	if err != nil {
-		enc.metrics.ObserveEncoderError(entry.LoggerName)
+		enc.observer.ObserveEncoderError(entry.LoggerName)
 		return nil, err
 	}
-	enc.metrics.ObserveEntryLogged(entry.LoggerName, entry.Level.String(), b.Len())
+	enc.observer.ObserveEntryLogged(entry.LoggerName, entry.Level.String(), b.Len())
 	return b, err
 }
 
