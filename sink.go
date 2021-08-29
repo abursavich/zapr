@@ -40,26 +40,65 @@ type sink struct {
 	observer Observer
 }
 
-// NewLogger returns a new Logger with the given Config.
-func NewLogger(c *Config) logr.Logger {
-	return logr.New(NewLogSink(c))
+// NewLogger returns a new Logger with the given options.
+func NewLogger(options ...Option) logr.Logger {
+	return logr.New(NewLogSink(options...))
 }
 
-// NewLogSink returns a new LogSink with the given Config.
-func NewLogSink(c *Config) LogSink {
+// NewLogSink returns a new LogSink with the given options.
+func NewLogSink(options ...Option) LogSink {
 	const depth = 1
-	logger := newZapLogger(c).WithOptions(zap.AddCallerSkip(depth))
-	if c.Observer != nil {
-		c.Observer.Init(loggerName(logger))
-	}
+	c := configWithOptions(options)
 	return &sink{
-		logger:   logger,
-		errKey:   c.ErrorKey,
+		logger:   newLogger(c).WithOptions(zap.AddCallerSkip(depth)),
+		errKey:   c.errorKey,
 		depth:    depth,
 		logLevel: 0,
-		maxLevel: c.Level,
-		observer: c.Observer,
+		maxLevel: c.level,
+		observer: c.observer,
 	}
+}
+
+// newLogger returns a new zap.Logger with the given config.
+func newLogger(c *config) *zap.Logger {
+	var opts []zap.Option
+	if c.development {
+		opts = append(opts, zap.Development())
+	}
+	if c.enableCaller {
+		opts = append(opts, zap.AddCaller())
+	}
+	if c.enableStacktrace {
+		opts = append(opts, zap.AddStacktrace(zapcore.ErrorLevel))
+	}
+	if c.sampleFirst != 0 || c.sampleThereafter != 0 {
+		opts = append(opts, zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+			return zapcore.NewSamplerWithOptions(core, c.sampleTick, c.sampleFirst, c.sampleThereafter, c.sampleOpts...)
+		}))
+	}
+	enc := c.encoder.NewEncoder(zapcore.EncoderConfig{
+		TimeKey:        c.timeKey,
+		LevelKey:       c.levelKey,
+		NameKey:        c.nameKey,
+		CallerKey:      c.callerKey,
+		FunctionKey:    c.functionKey,
+		MessageKey:     c.messageKey,
+		StacktraceKey:  c.stacktraceKey,
+		LineEnding:     c.lineEnding,
+		EncodeTime:     c.timeEncoder.TimeEncoder(),
+		EncodeLevel:    c.levelEncoder.LevelEncoder(),
+		EncodeDuration: c.durationEncoder.DurationEncoder(),
+		EncodeCaller:   c.callerEncoder.CallerEncoder(),
+	})
+	if c.observer != nil {
+		enc = &observerEncoder{
+			Encoder:  enc,
+			observer: c.observer,
+		}
+		c.observer.Init(c.name)
+	}
+	core := zapcore.NewCore(enc, c.ws, zapcore.InfoLevel)
+	return zap.New(core, opts...).Named(c.name)
 }
 
 func (s *sink) sweeten(kvs []interface{}) []zapcore.Field {
