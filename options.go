@@ -155,6 +155,15 @@ func WithWriteSyncer(ws zapcore.WriteSyncer) Option {
 	}
 }
 
+// WithObserver returns an Option that sets the metrics Observer.
+// There is no default Observer.
+func WithObserver(observer Observer) Option {
+	return opt{
+		applyFn:    func(c *config) { c.observer = observer },
+		registerFn: func(fs *flag.FlagSet) {},
+	}
+}
+
 // WithName returns an Option that sets the name.
 // The default value is empty.
 func WithName(name string) Option {
@@ -445,6 +454,7 @@ func AllOptions(overrides ...Option) []Option {
 	c := configWithOptions(overrides)
 	return []Option{
 		WithWriteSyncer(c.ws),
+		WithObserver(c.observer),
 		WithName(c.name),
 		WithLevel(c.level),
 		WithTimeKey(c.timeKey),
