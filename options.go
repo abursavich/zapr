@@ -9,6 +9,7 @@ package zapr
 import (
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"bursavich.dev/zapr/encoding"
@@ -50,7 +51,7 @@ type config struct {
 
 func configWithOptions(options []Option) *config {
 	c := &config{
-		ws:               zapcore.Lock(os.Stderr),
+		ws:               stderr(),
 		name:             "",
 		level:            0,
 		timeKey:          "time",
@@ -80,6 +81,26 @@ func configWithOptions(options []Option) *config {
 	}
 	return c
 }
+
+func stderr() zapcore.WriteSyncer {
+	if err := os.Stderr.Sync(); err != nil {
+		// TODO: errors.Is(syscall.EINVAL)
+		return &stderrNoopSyncer{}
+	}
+	return zapcore.Lock(os.Stderr)
+}
+
+type stderrNoopSyncer struct {
+	mu sync.Mutex
+}
+
+func (s *stderrNoopSyncer) Write(b []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return os.Stderr.Write(b)
+}
+
+func (*stderrNoopSyncer) Sync() error { return nil }
 
 // An Option applies optional configuration.
 type Option interface {
