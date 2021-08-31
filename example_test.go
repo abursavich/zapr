@@ -12,12 +12,12 @@ import (
 )
 
 func ExampleNewLogger() {
+	addr := flag.String("http-address", ":8080", "HTTP server listen address.")
 	zaprObserver := zaprprom.NewObserver()
 	zaprOptions := zapr.RegisterFlags(flag.CommandLine, zapr.AllOptions(
 		zapr.WithObserver(zaprObserver),
 		zapr.WithLevel(2), // Override default logging level.
 	)...)
-	addr := flag.String("http-address", ":8080", "HTTP server listen address.")
 	flag.Parse()
 
 	log, sink := zapr.NewLogger(zaprOptions...)
@@ -29,7 +29,7 @@ func ExampleNewLogger() {
 		collectors.NewGoCollector(),
 		collectors.NewBuildInfoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		zaprObserver,
+		zaprObserver, // Register Observer with Prometheus.
 	)
 	log.Info("Hello, zap logr Prometheus metrics!")
 
