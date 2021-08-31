@@ -3,6 +3,7 @@ package zapr
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"strings"
 	"testing"
 
@@ -52,4 +53,21 @@ func TestLogger(t *testing.T) {
 	if want, got := 42, entry.Bar; got != want {
 		t.Errorf("unexpected bar: want: %v; got: %v", want, got)
 	}
+}
+
+func TestFlag(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	opts := RegisterFlags(fs, AllOptions()...)
+	if err := fs.Parse([]string{"--log-development"}); err != nil {
+		t.Fatal(err)
+	}
+	c := configWithOptions(opts)
+	if want, got := true, c.development; got != want {
+		t.Errorf("unexpected development: want: %v; got: %v", want, got)
+	}
+
+	b := bytes.NewBuffer(nil)
+	fs.SetOutput(b)
+	fs.Usage()
+	t.Logf("%s", b.Bytes())
 }
