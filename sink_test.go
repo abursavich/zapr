@@ -12,7 +12,7 @@ import (
 
 func TestLogger(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	log := NewLogger(
+	log, _ := NewLogger(
 		// defaults
 		WithEncoder(encoding.JSONEncoder()),
 		WithLineEnding("\n"),

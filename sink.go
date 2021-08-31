@@ -40,9 +40,10 @@ type sink struct {
 	observer Observer
 }
 
-// NewLogger returns a new Logger with the given options.
-func NewLogger(options ...Option) logr.Logger {
-	return logr.New(NewLogSink(options...))
+// NewLogger returns a new Logger with the given options and a flush function.
+func NewLogger(options ...Option) (logger logr.Logger, flush func() error) {
+	s := NewLogSink(options...)
+	return logr.New(s), s.Flush
 }
 
 // NewLogSink returns a new LogSink with the given options.
