@@ -63,7 +63,7 @@ func configWithOptions(options []Option) *config {
 		nameKey:          "logger",
 		callerKey:        "caller",
 		functionKey:      "",
-		messageKey:       "msg",
+		messageKey:       "message",
 		errorKey:         "error",
 		stacktraceKey:    "stacktrace",
 		lineEnding:       zapcore.DefaultLineEnding,
@@ -242,7 +242,7 @@ func WithFunctionKey(key string) Option {
 }
 
 // WithMessageKey returns an Option that sets the message key.
-// The default value is "msg".
+// The default value is "message".
 func WithMessageKey(key string) Option {
 	return opt{
 		applyFn: func(c *config) { c.messageKey = key },
