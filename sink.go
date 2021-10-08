@@ -199,16 +199,31 @@ func (s *sink) Underlying() *zap.Logger {
 
 func (s *sink) Flush() error { return s.logger.Sync() }
 
+var runtimeInfo logr.RuntimeInfo
+
+func init() {
+	logr.New((*infoSink)(&runtimeInfo))
+}
+
+type infoSink logr.RuntimeInfo
+
+func (s *infoSink) Init(info logr.RuntimeInfo)                              { *s = (infoSink)(info) }
+func (s *infoSink) WithValues(keysAndValues ...interface{}) logr.LogSink    { return s }
+func (s *infoSink) WithName(name string) logr.LogSink                       { return s }
+func (*infoSink) Enabled(level int) bool                                    { return false }
+func (*infoSink) Info(level int, msg string, keysAndValues ...interface{})  {}
+func (*infoSink) Error(err error, msg string, keysAndValues ...interface{}) {}
+
 // NewStdInfoLogger returns a *log.Logger which writes to the supplied Logger's Info method.
 func NewStdInfoLogger(s logr.CallDepthLogSink) *log.Logger {
-	infoFn := s.WithCallDepth(4).Info
+	infoFn := s.WithCallDepth(4 - runtimeInfo.CallDepth).Info
 	fn := func(msg string, _ ...interface{}) { infoFn(0, msg) }
 	return log.New(stdLogWriterFunc(fn), "" /*prefix*/, 0 /*flags*/)
 }
 
 // NewStdErrorLogger returns a *log.Logger which writes to the supplied Logger's Error method.
 func NewStdErrorLogger(s logr.CallDepthLogSink) *log.Logger {
-	errFn := s.WithCallDepth(4).Error
+	errFn := s.WithCallDepth(4 - runtimeInfo.CallDepth).Error
 	fn := func(msg string, _ ...interface{}) { errFn(nil, msg) }
 	return log.New(stdLogWriterFunc(fn), "" /*prefix*/, 0 /*flags*/)
 }
