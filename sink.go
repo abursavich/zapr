@@ -117,7 +117,11 @@ func (s *sink) sweeten(kvs []interface{}) []zapcore.Field {
 				)
 				return fields
 			}
-			fields = append(fields, zap.Any(key, kvs[i+1]))
+			val := kvs[i+1]
+			if x, ok := val.(logr.Marshaler); ok {
+				val = x.MarshalLog()
+			}
+			fields = append(fields, zap.Any(key, val))
 			i += 2
 		case zapcore.Field:
 			s.sweetenDPanic("Zap Field passed to logr",
