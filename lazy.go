@@ -84,11 +84,9 @@ func (s *lazySink) WithValues(keysAndValues ...any) logr.LogSink {
 	defer s.mu.Unlock()
 
 	child := newLazySink()
-	child.Init(s.info)
 	child.values = append([]any(nil), keysAndValues...)
-	if s.set {
-		s.SetSink(*s.sink.Load())
-	}
+	child.Init(s.info)
+	child.SetSink(*s.sink.Load())
 	s.children = append(s.children, child)
 	return child
 }
@@ -98,11 +96,9 @@ func (s *lazySink) WithName(name string) logr.LogSink {
 	defer s.mu.Unlock()
 
 	child := newLazySink()
-	child.Init(s.info)
 	child.name = name
-	if s.set {
-		s.SetSink(*s.sink.Load())
-	}
+	child.Init(s.info)
+	child.SetSink(*s.sink.Load())
 	s.children = append(s.children, child)
 	return child
 }
@@ -112,11 +108,9 @@ func (s *lazySink) WithCallDepth(depth int) logr.LogSink {
 	defer s.mu.Unlock()
 
 	child := newLazySink()
-	child.Init(s.info)
 	child.depth = depth
-	if s.set {
-		s.SetSink(*s.sink.Load())
-	}
+	child.Init(s.info)
+	child.SetSink(*s.sink.Load())
 	s.children = append(s.children, child)
 	return child
 }
@@ -144,7 +138,6 @@ func (s *lazySink) SetSink(sink LogSink) {
 		sink = sink.WithCallDepth(s.depth).(LogSink)
 	}
 	s.sink.Store(&sink)
-	s.set = true
 
 	for _, c := range s.children {
 		c.SetSink(sink)
